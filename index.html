@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Agrow</title>
+
+  <link rel="stylesheet" href="https://js.arcgis.com/4.26/esri/themes/light/main.css" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="https://js.arcgis.com/4.26/"></script>
+</head>
+
+<body>
+  <div id="appContainer">
+    <div id="sidebar">
+      <h2>Agrow</h2>
+
+      <div class="filter-section">
+        <h3>Filters</h3>
+
+        <label>Observation Type</label>
+        <select id="obsFilter">
+          <option value="">All</option>
+        </select>
+
+        <label>Status</label>
+        <select id="statusFilter">
+          <option value="">All</option>
+        </select>
+
+        <label>Severity</label>
+        <select id="severityFilter">
+          <option value="">All</option>
+        </select>
+
+        <button id="clearFilters">Clear Filters</button>
+      </div>
+    </div>
+
+    <div id="viewDiv"></div>
+  </div>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
