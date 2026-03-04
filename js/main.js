@@ -186,7 +186,7 @@ var basemapGallery = new BasemapGallery({
   view: view,
   source: [
     { basemap: "satellite", title: "Imagery" },
-    { basemap: "topo-vector", title: "Topographic" }
+    { basemap: "topo", title: "Topographic" }
   ]
 });
 
