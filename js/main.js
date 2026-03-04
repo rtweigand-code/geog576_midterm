@@ -299,6 +299,38 @@ var editor = new Editor({
   clearBtn.addEventListener("click", clearFilters);
 
   // ----------------------------------------------------
+  // buttons that trigger the Editor workflows
+  // ----------------------------------------------------
+  var addFieldDataBtn = document.getElementById("addFieldDataBtn");
+  var addLandBtn = document.getElementById("addLandBtn");
+
+  function openEditorForLayer(layer) {
+    // open the editor panel so the user sees the form
+    editorExpand.expanded = true;
+
+    // close other panels so it's not messy
+    basemapExpand.expanded = false;
+    layersExpand.expanded = false;
+
+    // give it a second to be ready (this avoids some random weirdness)
+    view.when(function () {
+      if (!editor.viewModel) return;
+
+      // pick the first template for that layer
+      // (if there are multiple, ArcGIS will show choices)
+      editor.viewModel.startCreateWorkflowAtFeatureType(layer);
+    });
+  }
+
+  addFieldDataBtn.addEventListener("click", function () {
+    openEditorForLayer(fieldDataLayer);
+  });
+
+  addLandBtn.addEventListener("click", function () {
+    openEditorForLayer(usersLandLayer);
+  });
+
+  // ----------------------------------------------------
   // auto-calc acres AFTER a polygon is saved
   // (keeps it simple: we calculate and then update the new feature)
   // ----------------------------------------------------
