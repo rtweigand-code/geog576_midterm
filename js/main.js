@@ -150,8 +150,7 @@ require([
   view.when(function () {
     Promise.all([
       Basemap.fromId("arcgis-imagery"),
-      Basemap.fromId("arcgis-topographic"),
-      Basemap.fromId("arcgis-light-gray")
+      Basemap.fromId("arcgis-topographic")
     ]).then(function (basemaps) {
       basemapGallery.source = basemaps;
     });
