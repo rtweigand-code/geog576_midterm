@@ -126,7 +126,7 @@ require([
   view.ui.move("zoom", "top-right");
 
   // ----------------------------------------------------
-  // widgets: left side tools (basemap, layers, editor)
+  // widgets: left side (basemap, layers, editor)
   // ----------------------------------------------------
   var basemapGallery = new BasemapGallery({
     view: view,
