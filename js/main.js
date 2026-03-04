@@ -119,8 +119,8 @@ require([
         field: "severity",
         stops: [
           { value: 1, size: 8 },
-          { value: 3, size: 14 },
-          { value: 5, size: 20 }
+          { value: 3, size: 10 },
+          { value: 5, size: 12 }
         ]
       }
     ]
