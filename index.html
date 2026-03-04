@@ -5,11 +5,12 @@
   <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>Agrow</title>
 
-  <!-- ArcGIS JS (same as labs) -->
+  <!-- ArcGIS JS (same as our labs) -->
   <link rel="stylesheet" href="https://js.arcgis.com/4.26/esri/themes/light/main.css" />
   <script src="https://js.arcgis.com/4.26/"></script>
 
   <style>
+    /* keep everything full screen */
     html, body {
       padding: 0;
       margin: 0;
@@ -18,13 +19,14 @@
       font-family: Arial, sans-serif;
     }
 
+    /* sidebar + map layout */
     #appContainer {
       display: flex;
       height: 100%;
       width: 100%;
     }
 
-    /* sidebar */
+    /* left panel */
     #sidebar {
       width: 280px;
       padding: 16px;
@@ -51,53 +53,108 @@
       margin-top: 5px;
     }
 
+    /* buttons */
     .btn {
-      margin-top: 12px;
+      margin-top: 10px;
       width: 100%;
       padding: 9px;
       border: none;
       cursor: pointer;
       font-weight: 600;
+      border-radius: 4px;
     }
 
-    #searchBtn {
-      background: #2f7edb;
-      color: white;
-    }
+    #searchBtn { background: #2f7edb; color: white; }
+    #searchBtn:hover { background: #2568b6; }
 
-    #searchBtn:hover {
-      background: #2568b6;
-    }
+    #clearFilters { background: #4CAF50; color: white; }
+    #clearFilters:hover { background: #45a049; }
 
-    #clearFilters {
-      background: #4CAF50;
-      color: white;
-    }
+    /* add buttons */
+    #addPointBtn { background: #111; color: white; }
+    #addPointBtn:hover { background: #333; }
 
-    #clearFilters:hover {
-      background: #45a049;
-    }
+    #addLandBtn { background: #111; color: white; }
+    #addLandBtn:hover { background: #333; }
 
-    /* map */
+    /* map area */
     #viewDiv {
       flex: 1;
     }
 
-    /* mobile */
-    @media (max-width: 768px) {
-      #appContainer {
-        flex-direction: column;
-      }
+    /* simple form overlay */
+    #formOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
 
+    #formCard {
+      width: 100%;
+      max-width: 420px;
+      background: #fff;
+      border-radius: 10px;
+      padding: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    #formTitle {
+      font-size: 18px;
+      font-weight: 700;
+      margin: 4px 0 10px 0;
+    }
+
+    .formRow {
+      margin: 10px 0;
+    }
+
+    .formRow label {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .formRow input, .formRow select, .formRow textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    .formActions {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .formActions button {
+      flex: 1;
+      padding: 9px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    #formSave { background: #2f7edb; color: #fff; }
+    #formCancel { background: #eee; }
+
+    /* phone layout */
+    @media (max-width: 768px) {
+      #appContainer { flex-direction: column; }
       #sidebar {
         width: 100%;
         border-right: none;
         border-bottom: 1px solid #ddd;
       }
-
-      #viewDiv {
-        height: 70%;
-      }
+      #viewDiv { height: 70%; }
     }
   </style>
 </head>
@@ -105,7 +162,6 @@
 <body>
   <div id="appContainer">
 
-    <!-- Sidebar Filters -->
     <div id="sidebar">
       <h2>Search Filters</h2>
 
@@ -131,11 +187,31 @@
 
       <button id="searchBtn" class="btn">Search</button>
       <button id="clearFilters" class="btn">Clear Filters</button>
+
+      <hr style="margin:14px 0; border:none; border-top:1px solid #ddd;" />
+
+      <button id="addPointBtn" class="btn">Add Field Data</button>
+      <button id="addLandBtn" class="btn">Add Land</button>
+
+      <p style="font-size:12px; color:#666; margin-top:10px;">
+        Tip: click a point/polygon to view info.
+      </p>
     </div>
 
-    <!-- Map -->
     <div id="viewDiv"></div>
+  </div>
 
+  <!-- little popup form -->
+  <div id="formOverlay">
+    <div id="formCard">
+      <div id="formTitle">Form</div>
+      <div id="formBody"></div>
+
+      <div class="formActions">
+        <button id="formCancel" type="button">Cancel</button>
+        <button id="formSave" type="button">Save</button>
+      </div>
+    </div>
   </div>
 
   <script src="js/main.js"></script>
