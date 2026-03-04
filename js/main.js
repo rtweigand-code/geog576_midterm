@@ -180,37 +180,23 @@ require([
   // ----------------------------------------------------
   // widgets: left side (basemap, layers, editor)
   // ----------------------------------------------------
-  // basemap picker (just imagery + topo)
+  
+// basemap gallery (only imagery + topo)
 var basemapGallery = new BasemapGallery({
-  view: view
-});
-
-view.when(function () {
-  Promise.all([
-    Basemap.fromId("arcgis-imagery"),
-    Basemap.fromId("arcgis-topographic")
-  ]).then(function (basemaps) {
-    basemapGallery.source = basemaps;
-  });
+  view: view,
+  source: [
+    { basemap: "satellite", title: "Imagery" },
+    { basemap: "topo-vector", title: "Topographic" }
+  ]
 });
 
 var basemapExpand = new Expand({
   view: view,
   content: basemapGallery,
-  expandTooltip: "Basemaps",
-  collapseTooltip: "Basemaps"
+  expandTooltip: "Basemaps"
 });
 
 view.ui.add(basemapExpand, "top-left");
-
-  var basemapExpand = new Expand({
-    view: view,
-    content: basemapGallery,
-    expandTooltip: "Basemaps",
-    collapseTooltip: "Basemaps"
-  });
-
-  view.ui.add(basemapExpand, "top-left");
 
   var layerList = new LayerList({
     view: view
