@@ -1,5 +1,4 @@
 # Agrow – Agricultural Field Observation Web App
-<<<<<<< HEAD
 
 ## Project Overview
 Agrow is a web-based mapping application designed to help farmers and landowners log spatial observations directly on a map interface. Users can draw field boundaries, add observation points, and track information about what is happening across their land.
