@@ -314,50 +314,44 @@ view.ui.add(editorExpand, "top-left");
     openEditorForLayer(usersLandLayer);
   });
 
-  // ----------------------------------------------------
-  // auto-calc acres AFTER a polygon is saved
-  // (keeps it simple: we calculate and then update the new feature)
-  // ----------------------------------------------------
-  usersLandLayer.on("edits", function (evt) {
-    // only care about new adds
-    if (!evt || !evt.addedFeatures || evt.addedFeatures.length === 0) return;
+  // auto calculate acres whenever a polygon is added
+usersLandLayer.on("edits", function (event) {
 
-    var added = evt.addedFeatures[0];
-    if (!added || !added.objectId) return;
+  // only run if new polygons were created
+  if (event.addedFeatures.length > 0) {
 
-    // pull the geometry we just added (we need it to calc area)
-    usersLandLayer.queryFeatures({
-      objectIds: [added.objectId],
-      returnGeometry: true,
-      outFields: ["*"]
-    }).then(function (res) {
-      if (!res.features || res.features.length === 0) return;
+    event.addedFeatures.forEach(function (feature) {
 
-      var feat = res.features[0];
-      if (!feat.geometry) return;
+      // grab the polygon geometry
+      var geom = feature.geometry;
 
-      // geodesic area in sq meters -> acres
-      var sqm = Math.abs(geometryEngine.geodesicArea(feat.geometry, "square-meters"));
-      var acres = sqm / 4046.8564224;
+      // calculate geodesic area in square meters
+      var sqMeters = geometryEngine.geodesicArea(geom, "square-meters");
 
-      // round a little so it doesn't look crazy
+      // convert to acres
+      var acres = Math.abs(sqMeters) * 0.000247105;
+
+      // round to 2 decimals
       acres = Math.round(acres * 100) / 100;
 
-      // update just the acres field
+      // get the correct object ID field name automatically
+      var oidField = usersLandLayer.objectIdField;
+
+      var attrs = {};
+      attrs[oidField] = feature.objectId;
+      attrs.acres = acres;
+
+      // update the feature with the acres value
       usersLandLayer.applyEdits({
         updateFeatures: [{
-          attributes: {
-            OBJECTID: added.objectId,
-            acres: acres
-          }
+          attributes: attrs
         }]
-      }).catch(function (err) {
-        console.log("acres update failed", err);
       });
-    }).catch(function (err) {
-      console.log("query for acres failed", err);
+
     });
-  });
+  }
+
+});
 
   // ----------------------------------------------------
   // once layers load, populate filter dropdowns from domains
