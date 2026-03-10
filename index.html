@@ -42,6 +42,23 @@
       <button id="searchBtn" class="btn btn-blue">Search</button>
       <button id="clearBtn" class="btn btn-green">Clear Filters</button>
 
+      <!-- CHANGE NOTE (Mar 2026):
+           Added a live summary box so users can immediately see how many
+           point/area features match the current filter combination. -->
+      <section id="filterResults" aria-live="polite">
+        <h2>Matching Features</h2>
+        <p id="filterResultsText">Checking current filters...</p>
+      </section>
+
+      <!-- CHANGE NOTE (Mar 2026):
+           Added a clickable list of matching point features.
+           Each item shows a numbered title + note snippet and is wired in main.js
+           to zoom/pan and open popup when clicked. -->
+      <section id="matchingFeatureListWrap" aria-live="polite">
+        <h2>Matching Point Features</h2>
+        <ul id="matchingFeatureList"></ul>
+      </section>
+
 
       <p class="tip">Tip: click a point/polygon to view info.</p>
     </aside>

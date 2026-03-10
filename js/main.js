@@ -46,6 +46,11 @@ require([
     title: "My Land",
     outFields: ["*"],
     popupEnabled: true,
+    // CHANGE NOTE (Mar 2026):
+    // 1) Renamed polygon crop label to "Crop Type of Area" to distinguish it
+    //    from point-level crop type in field-data popups.
+    // 2) Added built-in ArcGIS attachments section so uploaded files appear at
+    //    the bottom of regular popups as clickable links.
     popupTemplate: {
       title: "{land_name}",
       content: [
@@ -53,9 +58,13 @@ require([
           type: "fields",
           fieldInfos: [
             { fieldName: "land_owner", label: "Owner" },
-            { fieldName: "crop_type", label: "Crop Type" },
+            { fieldName: "crop_type", label: "Crop Type of Area" },
             { fieldName: "acres", label: "Acres" }
           ]
+        },
+        {
+          type: "attachments",
+          displayType: "list"
         }
       ]
     }
@@ -129,6 +138,9 @@ require([
   },
 
   popupEnabled: true,
+  // CHANGE NOTE (Mar 2026):
+  // Added built-in attachments section to point popups so uploads are visible
+  // at the bottom without overriding the normal field list behavior.
   popupTemplate: {
       title: "{title}",
       content: [
@@ -141,6 +153,10 @@ require([
             { fieldName: "crop_type", label: "Crop Type" },
             { fieldName: "obs_notes", label: "Notes" }
           ]
+        },
+        {
+          type: "attachments",
+          displayType: "list"
         }
       ]
     }
@@ -240,35 +256,258 @@ view.ui.add(editorExpand, "top-left");
   var statusSelect = document.getElementById("statusSelect");
   var severitySelect = document.getElementById("severitySelect");
   var cropTypeSelect = document.getElementById("cropTypeSelect");
+  var filterResultsText = document.getElementById("filterResultsText");
+  var matchingFeatureList = document.getElementById("matchingFeatureList");
 
   var searchBtn = document.getElementById("searchBtn");
   var clearBtn = document.getElementById("clearBtn");
 
-  function fillSelectFromDomain(selectEl, layer, fieldName) {
-    var f = layer.fields.find(function (fld) { return fld.name === fieldName; });
-    if (!f || !f.domain || !f.domain.codedValues) return;
-
-    // wipe old options except the first "All"
+  function clearSelectOptions(selectEl) {
     while (selectEl.options.length > 1) selectEl.remove(1);
+  }
 
-    f.domain.codedValues.forEach(function (cv) {
+  function getDomainValues(layer, fieldName) {
+    var field = layer.fields && layer.fields.find(function (f) { return f.name === fieldName; });
+    if (!field || !field.domain || !field.domain.codedValues) return [];
+
+    return field.domain.codedValues.map(function (cv) {
+      return { value: cv.code, label: cv.name };
+    });
+  }
+
+  function getUniqueValuesFromFeatures(features, fieldName) {
+    var found = {};
+    var values = [];
+
+    features.forEach(function (feature) {
+      var val = feature.attributes[fieldName];
+      if (val === null || val === undefined || val === "") return;
+
+      var key = String(val);
+      if (!found[key]) {
+        found[key] = true;
+        values.push({ value: val, label: String(val) });
+      }
+    });
+
+    values.sort(function (a, b) {
+      return String(a.label).localeCompare(String(b.label));
+    });
+
+    return values;
+  }
+
+  // CHANGE NOTE (Mar 2026):
+  // Filter dropdowns originally stayed on "All" because some field metadata
+  // and/or domains were not always available at initial load. This helper set
+  // supports mixed sources (domains + queried feature values).
+  function fillSelectFromPairs(selectEl, pairs) {
+    clearSelectOptions(selectEl);
+
+    var seen = {};
+    pairs.forEach(function (pair) {
+      var key = String(pair.value);
+      if (seen[key]) return;
+      seen[key] = true;
+
       var opt = document.createElement("option");
-      opt.value = cv.code;
-      opt.textContent = cv.name;
+      opt.value = pair.value;
+      opt.textContent = pair.label;
       selectEl.appendChild(opt);
     });
   }
 
+  function toSqlLiteral(value) {
+    return "'" + String(value).replace(/'/g, "''") + "'";
+  }
+
+  function getSelectedFilterValues() {
+    return {
+      obs_type: obsTypeSelect.value,
+      status: statusSelect.value,
+      severity: severitySelect.value,
+      crop_type: cropTypeSelect.value
+    };
+  }
+
+  function layerHasField(layer, fieldName) {
+    return !!(layer.fields && layer.fields.some(function (f) { return f.name === fieldName; }));
+  }
+
+  // CHANGE NOTE (Mar 2026):
+  // Builds a safe SQL where clause from selected filters.
+  // If a selected field does not exist on a layer, we return "1=0" for that
+  // layer to avoid invalid SQL and misleading counts.
+  function buildWhereFromSelected(layer, selected) {
+    var parts = [];
+
+    Object.keys(selected).forEach(function (fieldName) {
+      var value = selected[fieldName];
+      if (!value) return;
+
+      if (!layerHasField(layer, fieldName)) {
+        parts.push("1=0");
+        return;
+      }
+
+      parts.push(fieldName + " = " + toSqlLiteral(value));
+    });
+
+    if (parts.length === 0) return "1=1";
+    if (parts.indexOf("1=0") !== -1) return "1=0";
+    return parts.join(" AND ");
+  }
+
+  function updateFilterResults() {
+    // CHANGE NOTE (Mar 2026):
+    // Central summary updater for sidebar feedback.
+    // - Counts matching points + areas
+    // - Updates "No features fit those criteria." state
+    // - Refreshes clickable matching point list
+    var selected = getSelectedFilterValues();
+    var pointsWhere = buildWhereFromSelected(fieldDataLayer, selected);
+    var areasWhere = buildWhereFromSelected(usersLandLayer, selected);
+
+    var matchingPointsQuery = fieldDataLayer.createQuery();
+    matchingPointsQuery.where = pointsWhere;
+    matchingPointsQuery.returnGeometry = true;
+    matchingPointsQuery.outFields = ["OBJECTID", "title", "obs_notes"];
+
+    Promise.all([
+      fieldDataLayer.queryFeatureCount({ where: pointsWhere }),
+      usersLandLayer.queryFeatureCount({ where: areasWhere }),
+      fieldDataLayer.queryFeatures(matchingPointsQuery)
+    ]).then(function (counts) {
+      var pointCount = counts[0] || 0;
+      var areaCount = counts[1] || 0;
+      var matchingPoints = (counts[2] && counts[2].features) ? counts[2].features : [];
+      var total = pointCount + areaCount;
+
+      if (total === 0) {
+        filterResultsText.textContent = "No features fit those criteria.";
+      } else {
+        filterResultsText.textContent = pointCount + " point feature(s) and " + areaCount + " area feature(s) fit those criteria.";
+      }
+
+      renderMatchingFeatureList(matchingPoints);
+    }).catch(function () {
+      filterResultsText.textContent = "Could not calculate matching feature counts.";
+      renderMatchingFeatureList([]);
+    });
+  }
+
+  function truncateSnippet(text, maxLength) {
+    if (!text) return "No notes";
+    var normalized = String(text).trim();
+    if (normalized.length <= maxLength) return normalized;
+    return normalized.slice(0, maxLength).trim() + "...";
+  }
+
+  function zoomToAndOpenFeature(feature) {
+    view.goTo({ target: feature.geometry, zoom: 16 }).then(function () {
+      view.popup.open({
+        features: [feature],
+        location: feature.geometry
+      });
+    }).catch(function () {
+      view.popup.open({
+        features: [feature],
+        location: feature.geometry
+      });
+    });
+  }
+
+  // CHANGE NOTE (Mar 2026):
+  // Renders the sidebar list of matching point features.
+  // Clicking an item zooms to that point and opens its popup.
+  function renderMatchingFeatureList(features) {
+    matchingFeatureList.innerHTML = "";
+
+    if (!features || features.length === 0) {
+      var empty = document.createElement("p");
+      empty.className = "feature-list-empty";
+      empty.textContent = "No matching point features.";
+      matchingFeatureList.appendChild(empty);
+      return;
+    }
+
+    features.forEach(function (feature, idx) {
+      var item = document.createElement("li");
+      item.className = "feature-item";
+
+      var number = document.createElement("span");
+      number.className = "feature-index";
+      number.textContent = String(idx + 1);
+
+      var body = document.createElement("div");
+      body.className = "feature-body";
+
+      var title = document.createElement("p");
+      title.className = "feature-title";
+      title.textContent = feature.attributes.title || ("Feature " + (idx + 1));
+
+      var snippet = document.createElement("p");
+      snippet.className = "feature-snippet";
+      snippet.textContent = truncateSnippet(feature.attributes.obs_notes, 90);
+
+      body.appendChild(title);
+      body.appendChild(snippet);
+
+      item.appendChild(number);
+      item.appendChild(body);
+
+      item.addEventListener("click", function () {
+        zoomToAndOpenFeature(feature);
+      });
+
+      matchingFeatureList.appendChild(item);
+    });
+  }
+
+  // CHANGE NOTE (Mar 2026):
+  // Populate dropdowns from both domains and live queried values.
+  // This is intentionally resilient when service metadata is constrained.
+  function populateFilterOptions() {
+    return Promise.all([
+      fieldDataLayer.when(),
+      usersLandLayer.when(),
+      view.whenLayerView(fieldDataLayer)
+    ]).then(function (results) {
+      var layerView = results[2];
+      var q = layerView.createQuery();
+      q.where = "1=1";
+      q.returnGeometry = false;
+      q.outFields = ["obs_type", "status", "severity", "crop_type"];
+
+      return layerView.queryFeatures(q).then(function (result) {
+        var features = result.features || [];
+
+        var obsValues = getDomainValues(fieldDataLayer, "obs_type")
+          .concat(getUniqueValuesFromFeatures(features, "obs_type"));
+        var statusValues = getDomainValues(fieldDataLayer, "status")
+          .concat(getUniqueValuesFromFeatures(features, "status"));
+        var severityValues = getDomainValues(fieldDataLayer, "severity")
+          .concat(getUniqueValuesFromFeatures(features, "severity"));
+
+        var cropValues = getDomainValues(fieldDataLayer, "crop_type")
+          .concat(getDomainValues(usersLandLayer, "crop_type"))
+          .concat(getUniqueValuesFromFeatures(features, "crop_type"));
+
+        fillSelectFromPairs(obsTypeSelect, obsValues);
+        fillSelectFromPairs(statusSelect, statusValues);
+        fillSelectFromPairs(severitySelect, severityValues);
+        fillSelectFromPairs(cropTypeSelect, cropValues);
+      });
+    }).catch(function (err) {
+      console.error("Could not populate filter options:", err);
+    });
+  }
+
   function applyFilters() {
-    var whereParts = [];
-
-    if (obsTypeSelect.value) whereParts.push("obs_type = '" + obsTypeSelect.value + "'");
-    if (statusSelect.value) whereParts.push("status = '" + statusSelect.value + "'");
-    if (severitySelect.value) whereParts.push("severity = " + severitySelect.value);
-    if (cropTypeSelect.value) whereParts.push("crop_type = '" + cropTypeSelect.value + "'");
-
-    var where = (whereParts.length > 0) ? whereParts.join(" AND ") : "1=1";
+    var selected = getSelectedFilterValues();
+    var where = buildWhereFromSelected(fieldDataLayer, selected);
     fieldDataLayer.definitionExpression = where;
+    updateFilterResults();
   }
 
   function clearFilters() {
@@ -277,6 +516,7 @@ view.ui.add(editorExpand, "top-left");
     severitySelect.value = "";
     cropTypeSelect.value = "";
     fieldDataLayer.definitionExpression = "1=1";
+    updateFilterResults();
   }
 
   searchBtn.addEventListener("click", applyFilters);
@@ -306,59 +546,113 @@ view.ui.add(editorExpand, "top-left");
     });
   }
 
-  addFieldDataBtn.addEventListener("click", function () {
-    openEditorForLayer(fieldDataLayer);
-  });
+  // CHANGE NOTE (Mar 2026):
+  // Guard optional editor button hooks to prevent null addEventListener errors
+  // when those buttons are not present in index.html.
+  if (addFieldDataBtn) {
+    addFieldDataBtn.addEventListener("click", function () {
+      openEditorForLayer(fieldDataLayer);
+    });
+  }
 
-  addLandBtn.addEventListener("click", function () {
-    openEditorForLayer(usersLandLayer);
-  });
+  if (addLandBtn) {
+    addLandBtn.addEventListener("click", function () {
+      openEditorForLayer(usersLandLayer);
+    });
+  }
 
-  // auto calculate acres when a land polygon is created
+  // ----------------------------------------------------
+  // CHANGE NOTE (Mar 2026):
+  // Auto-calculate accurate polygon area in acres
+  // ----------------------------------------------------
+  // This helper function calculates the accurate geodesic area of a polygon
+  // and converts it to acres. Used for both create and update operations.
+  // 
+  // Calculation steps:
+  // 1. Use ArcGIS geodesicArea to get true surface area in square meters
+  //    (accounts for Earth's curvature, more accurate than planar calculation)
+  // 2. Convert square meters to acres using standard conversion factor
+  //    1 acre = 4046.8564224 square meters
+  // 3. Round to 2 decimal places for display
+  function calculateAndUpdateAcres(graphic) {
+    if (!graphic || !graphic.geometry) return;
+
+    // Calculate polygon area in square meters using geodesic measurement
+    var sqm = Math.abs(
+      geometryEngine.geodesicArea(graphic.geometry, "square-meters")
+    );
+
+    // Convert to acres (1 acre = 4046.8564224 square meters)
+    var acres = sqm / 4046.8564224;
+
+    // Round to 2 decimal places for readability
+    acres = Math.round(acres * 100) / 100;
+
+    // Prepare attribute update with calculated acres
+    var oidField = usersLandLayer.objectIdField;
+    var attrs = {};
+    attrs[oidField] = graphic.attributes[oidField];
+    attrs.acres = acres;
+
+    // Update the acres field on the saved feature
+    usersLandLayer.applyEdits({
+      updateFeatures: [{ attributes: attrs }]
+    });
+  }
+
+  // Auto-calculate acres when a new land polygon is created
   editor.viewModel.on("create", function (evt) {
+    // Only run once drawing is finished
+    if (evt.state !== "complete") return;
 
-  // only run once drawing is finished
-  if (evt.state !== "complete") return;
-
-  var feat = evt.graphic;
-
-  if (!feat.geometry) return;
-
-  // calculate polygon area in square meters
-  var sqm = Math.abs(
-    geometryEngine.geodesicArea(feat.geometry, "square-meters")
-  );
-
-  // convert to acres
-  var acres = sqm / 4046.8564224;
-
-  // round to 2 decimals
-  acres = Math.round(acres * 100) / 100;
-
-  var oidField = usersLandLayer.objectIdField;
-
-  var attrs = {};
-  attrs[oidField] = feat.attributes[oidField];
-  attrs.acres = acres;
-
-  // update acres field on the saved feature
-  usersLandLayer.applyEdits({
-    updateFeatures: [{ attributes: attrs }]
+    calculateAndUpdateAcres(evt.graphic);
   });
 
+  // Auto-recalculate acres when an existing polygon is edited/resized
+  // This ensures acres stay accurate even after geometry modifications
+  editor.viewModel.on("update", function (evt) {
+    // Only run once editing is finished
+    if (evt.state !== "complete") return;
+
+    // Only recalculate for land polygons from usersLandLayer
+    if (evt.graphic && evt.graphic.layer === usersLandLayer) {
+      calculateAndUpdateAcres(evt.graphic);
+    }
+  });
+
+  // CHANGE NOTE (Mar 2026):
+  // Auto-calculate acres for existing polygons when popup opens
+  // This ensures all polygons (even those created before this code was added)
+  // display accurate acreage in their popups.
+  view.popup.watch("selectedFeature", function (graphic) {
+    if (!graphic) return;
+    
+    // Only process land polygons from usersLandLayer
+    if (graphic.layer !== usersLandLayer) return;
+    
+    // Check if acres field is missing, null, or zero
+    var currentAcres = graphic.attributes && graphic.attributes.acres;
+    if (currentAcres === null || currentAcres === undefined || currentAcres === 0) {
+      // Calculate and update acres for this polygon
+      calculateAndUpdateAcres(graphic);
+      
+      // Refresh the popup to show the newly calculated value
+      setTimeout(function () {
+        if (view.popup.selectedFeature === graphic) {
+          view.popup.reposition();
+        }
+      }, 500);
+    }
   });
 
   // ----------------------------------------------------
   // once layers load, populate filter dropdowns from domains
   // ----------------------------------------------------
-  view.when(function () {
-    // these come from your hosted layer domains
-    fillSelectFromDomain(obsTypeSelect, fieldDataLayer, "obs_type");
-    fillSelectFromDomain(statusSelect, fieldDataLayer, "status");
-    fillSelectFromDomain(severitySelect, fieldDataLayer, "severity");
-
-    // crop_type exists on both layers, but we just use fieldData domain for filtering
-    fillSelectFromDomain(cropTypeSelect, fieldDataLayer, "crop_type");
+  // CHANGE NOTE (Mar 2026):
+  // Initialize sidebar filter UX after layer/view readiness.
+  // This ensures dropdown options + counts/list are ready on first load.
+  populateFilterOptions().then(function () {
+    updateFilterResults();
   });
 
 });

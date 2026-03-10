@@ -55,6 +55,107 @@ html, body {
 .btn-green { background: #43a047; color: #fff; }
 .btn-dark { background: #111; color: #fff; }
 
+/* CHANGE NOTE (Mar 2026):
+  Styles for the new filter-result summary panel below the filter buttons.
+  Purpose: show users count feedback after Search/Clear actions. */
+#filterResults {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #f7f7f7;
+}
+
+#filterResults h2 {
+  margin: 0 0 6px 0;
+  font-size: 15px;
+}
+
+#filterResults p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* CHANGE NOTE (Mar 2026):
+   Styles for the new matching-point list panel.
+   Purpose: display clickable feature cards that jump to map popups. */
+#matchingFeatureListWrap {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+#matchingFeatureListWrap h2 {
+  margin: 0 0 8px 0;
+  font-size: 15px;
+}
+
+#matchingFeatureList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.feature-item {
+  display: flex;
+  gap: 8px;
+  border: 1px solid #e3e3e3;
+  border-radius: 4px;
+  padding: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  background: #fafafa;
+}
+
+.feature-item:hover {
+  background: #f0f5ff;
+  border-color: #bfd1f7;
+}
+
+.feature-index {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #2b74d8;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 1px;
+}
+
+.feature-body {
+  min-width: 0;
+}
+
+.feature-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1f1f1f;
+}
+
+.feature-snippet {
+  margin: 2px 0 0 0;
+  font-size: 12px;
+  color: #5a5a5a;
+  line-height: 1.35;
+}
+
+.feature-list-empty {
+  margin: 0;
+  font-size: 13px;
+  color: #666;
+}
+
 hr {
   margin: 16px 0;
   border: none;
